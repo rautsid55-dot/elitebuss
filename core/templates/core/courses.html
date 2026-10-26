@@ -1,0 +1,26 @@
+{% extends 'core/base.html' %}
+{% block title %}All Courses &middot; EliteBuss{% endblock %}
+{% block content %}
+<div style="margin-bottom:32px;">
+    <h1 style="margin:0; font-size:36px; font-weight:800; letter-spacing:-.04em;">All Courses</h1>
+    <p class="muted" style="margin:8px 0 0; font-size:16px;">Master new skills with our premium library.</p>
+</div>
+
+<div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:24px;">
+    {% for course in courses %}
+    <div class="glass" style="display:flex; flex-direction:column; overflow:hidden; transition:transform .3s ease; cursor:pointer;" onmouseover="this.style.transform='translateY(-8px)'" onmouseout="this.style.transform='none'">
+        <div style="width:100%; aspect-ratio:16/9; overflow:hidden; border-radius:24px 24px 0 0;">
+            <img src="{{ course.thumbnail_url }}" alt="{{ course.title }}" style="width:100%; height:100%; object-fit:cover;">
+        </div>
+        <div style="padding:24px; flex:1; display:flex; flex-direction:column;">
+            <h3 style="margin:0 0 12px; font-size:20px; font-weight:800; line-height:1.2;">{{ course.title }}</h3>
+            <p class="muted" style="margin:0 0 20px; font-size:14px; line-height:1.5; flex:1;">{{ course.description|truncatechars:70 }}</p>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:22px; font-weight:800; letter-spacing:-.02em;">₹{{ course.price }}</span>
+                <a href="{% url 'course_detail' course.id %}" class="btn" style="padding:10px 20px; border-radius:14px;">View</a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

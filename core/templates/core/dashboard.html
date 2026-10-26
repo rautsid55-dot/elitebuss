@@ -1,0 +1,69 @@
+{% extends 'core/base.html' %}
+{% block title %}Owner Panel &middot; EliteBuss{% endblock %}
+{% block content %}
+<div style="display:flex; align-items:end; justify-content:space-between; gap:16px; margin-bottom:30px; flex-wrap:wrap;">
+    <div>
+        <h1 style="margin:0; font-size:clamp(28px,4vw,36px); font-weight:800;">Owner Dashboard</h1>
+        <p class="muted" style="margin:8px 0 0; font-size:15px;">Manage your platform, courses, and payments.</p>
+    </div>
+    <div style="background:rgba(52,199,89,.15); color:#0a6b2b; font-weight:700; padding:10px 20px; border-radius:999px; border:1px solid rgba(52,199,89,.3); font-size:13px;">System Online</div>
+</div>
+
+<div class="stats">
+    <div class="stat glass"><h3>Total Revenue</h3><h2>₹{{ total_revenue }}</h2></div>
+    <div class="stat glass"><h3>Verified Sales</h3><h2>{{ purchases_count }}</h2></div>
+    <div class="stat glass"><h3>Total Users</h3><h2>{{ users.count }}</h2></div>
+</div>
+
+<div class="dash-cols">
+    <div class="panel glass">
+        <h2>💳 Payment Gateways</h2>
+        <form method="POST">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="save_settings">
+            <div class="form-group"><label>Razorpay Key ID</label><input type="text" name="razorpay_key_id" value="{{ settings.razorpay_key_id|default_if_none:'' }}" placeholder="rzp_live_..."></div>
+            <div class="form-group"><label>Razorpay Key Secret</label><input type="password" name="razorpay_key_secret" value="{{ settings.razorpay_key_secret|default_if_none:'' }}" placeholder="Enter Key Secret"></div>
+            <div class="form-group"><label>Webhook Secret</label><input type="text" name="razorpay_webhook_secret" value="{{ settings.razorpay_webhook_secret|default_if_none:'' }}" placeholder="Enter Webhook Secret"></div>
+            <div class="form-group"><label>Referral Commission (%)</label><input type="number" step="0.01" name="commission" value="{{ settings.referral_commission_percentage }}"></div>
+            <button type="submit" class="btn btn-block" style="margin-top:10px;">Save Payment Settings</button>
+        </form>
+    </div>
+
+    <div class="panel glass">
+        <h2>➕ Add New Course</h2>
+        <form method="POST">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_course">
+            <div class="form-group"><label>Course Title</label><input type="text" name="title" required placeholder="Master Digital Marketing 2026"></div>
+            <div class="form-group"><label>Price (INR)</label><input type="number" step="0.01" name="price" required placeholder="999.00"></div>
+            <div class="form-group"><label>Thumbnail URL</label><input type="url" name="thumbnail_url" required placeholder="https://images.unsplash.com/..."></div>
+            <div class="form-group"><label>Video Link</label><input type="url" name="video_url" required placeholder="https://youtube.com/..."></div>
+            <div class="form-group"><label>Description</label><input type="text" name="description" required placeholder="Full lifetime access..."></div>
+            <button type="submit" class="btn btn-block" style="margin-top:10px;">Publish Course</button>
+        </form>
+    </div>
+</div>
+
+<div class="panel glass">
+    <h2>📚 Active Courses</h2>
+    <div class="table-wrap">
+        <table class="table">
+            <tr><th>Title</th><th>Price</th><th>Action</th></tr>
+            {% for course in courses %}
+            <tr>
+                <td><strong>{{ course.title }}</strong></td>
+                <td>₹{{ course.price }}</td>
+                <td>
+                    <form method="POST" style="display:inline;">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="delete_course">
+                        <input type="hidden" name="course_id" value="{{ course.id }}">
+                        <button type="submit" class="btn danger" style="padding:8px 14px; font-size:13px;">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+</div>
+{% endblock %}

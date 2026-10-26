@@ -1,0 +1,38 @@
+{% extends 'core/base.html' %}
+{% block title %}Affiliate &middot; EliteBuss{% endblock %}
+{% block content %}
+<h1 style="margin-bottom:24px; font-size:32px; font-weight:800;">Affiliate Program</h1>
+<div class="dash-cols">
+    <div class="panel glass">
+        <h2>🔗 Your Referral Link</h2>
+        <p class="muted" style="margin-bottom:16px;">Share this link with friends. You earn a commission when they buy!</p>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <input type="text" id="refLink" value="http://127.0.0.1:8000/signup/?ref={{ user.referral_code }}" readonly style="flex:1; min-width:200px; background:rgba(255,255,255,.3);">
+            <button onclick="navigator.clipboard.writeText(document.getElementById('refLink').value); this.innerText='Copied!'; setTimeout(()=>this.innerText='Copy', 2000);" class="btn">Copy</button>
+        </div>
+    </div>
+    <div class="panel glass">
+        <h2>💰 Earnings</h2>
+        <div style="font-size:36px; font-weight:800; color:#34c759; margin-bottom:8px;">₹{{ total_earnings|default:"0" }}</div>
+        <p class="muted">From {{ referrals.count }} successful referrals.</p>
+    </div>
+</div>
+
+<div class="panel glass">
+    <h2>📊 Referral History</h2>
+    <div class="table-wrap">
+        <table class="table">
+            <tr><th>User</th><th>Course</th><th>Commission</th></tr>
+            {% for ref in referrals %}
+            <tr>
+                <td>{{ ref.purchase.user.username }}</td>
+                <td>{{ ref.purchase.course.title }}</td>
+                <td style="color:#34c759; font-weight:700;">+ ₹{{ ref.amount }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="3" style="text-align:center; color:var(--muted);">No referrals yet. Share your link!</td></tr>
+            {% endfor %}
+        </table>
+    </div>
+</div>
+{% endblock %}

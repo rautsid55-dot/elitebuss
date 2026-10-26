@@ -1,0 +1,85 @@
+{% extends 'core/base.html' %}
+{% block title %}{{ course.title }} &middot; EliteBuss{% endblock %}
+{% block extra_head %}<script src="https://checkout.razorpay.com/v1/checkout.js"></script>{% endblock %}
+{% block content %}
+<div class="glass" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); overflow:hidden; margin-bottom:32px; border-radius:32px;">
+    
+    <div style="aspect-ratio:4/3; background:#e7ecf7; width:100%; height:100%;">
+        <img src="{{ course.thumbnail_url|default:'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800' }}" alt="{{ course.title }}" style="width:100%; height:100%; object-fit:cover;">
+    </div>
+    
+    <div style="padding:48px; display:flex; flex-direction:column; justify-content:center;">
+        <div style="display:inline-block; margin-bottom:16px; color:#0a84ff; font-weight:800; letter-spacing:.08em; text-transform:uppercase; font-size:12px; background:rgba(10,132,255,.1); padding:8px 14px; border-radius:999px; align-self:flex-start;">Premium Course</div>
+        
+        <h1 style="font-size:clamp(28px,4vw,40px); font-weight:800; margin:0 0 16px; line-height:1.1; letter-spacing:-.03em;">{{ course.title }}</h1>
+        
+        <p class="muted" style="font-size:16px; line-height:1.6; margin:0 0 32px;">{{ course.description }}</p>
+        
+        <div style="font-size:42px; font-weight:800; letter-spacing:-.04em; margin-bottom:32px;">₹{{ course.price }}</div>
+        
+        {% if has_purchased %}
+            <div style="margin-bottom: 24px; background: rgba(52,199,89,.15); color: #0a6b2b; border:1px solid rgba(52,199,89,.3); font-weight:600; padding:16px; border-radius:16px;">✅ You have lifetime access.</div>
+            <a href="{{ course.video_url }}" target="_blank" class="btn btn-block" style="font-size:18px; padding:18px; border-radius:20px;">Watch Course Video</a>
+        {% elif payment_disabled %}
+            <div style="margin-bottom: 24px; background: rgba(255,59,48,.15); color: #a3130b; border:1px solid rgba(255,59,48,.3); font-weight:600; padding:16px; border-radius:16px;">⚠️ Payments temporarily disabled.</div>
+        {% else %}
+            <button id="rzp-button1" class="btn btn-block" style="font-size:18px; padding:18px; border-radius:20px;">Buy Now</button>
+        {% endif %}
+    </div>
+</div>
+
+{% if not has_purchased and not payment_disabled %}
+<div id="demoModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); backdrop-filter:blur(10px); z-index:999; align-items:center; justify-content:center; opacity:0; transition:opacity .3s;">
+    <div style="background:var(--glass-bg); border:var(--glass-border); padding:40px; border-radius:32px; max-width:400px; width:90%; text-align:center; box-shadow:var(--shadow-lg); transform:scale(.9); transition:transform .3s;">
+        <div style="width:60px; height:60px; background:rgba(10,132,255,.1); border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 20px;">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#0a84ff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        </div>
+        <h2 style="margin:0 0 10px; font-size:24px; font-weight:800; color:var(--ink);">Confirm Purchase</h2>
+        <p style="margin:0 0 24px; color:var(--muted); font-size:15px;">You are about to unlock <strong>{{ course.title }}</strong> for lifetime access.</p>
+        <div style="display:flex; gap:12px;">
+            <button onclick="closeDemo()" class="btn ghost" style="flex:1; padding:14px;">Cancel</button>
+            <button onclick="payDemo()" class="btn" style="flex:1; padding:14px;">Pay ₹{{ course.price }}</button>
+        </div>
+    </div>
+</div>
+
+<script>
+var options = {
+    "key": "{{ razorpay_merchant_key }}", "amount": "{{ order_amount }}", "currency": "INR",
+    "name": "EliteBuss", "description": "{{ course.title }}", "order_id": "{{ razorpay_order_id }}",
+    "handler": function (response){
+        var form = document.createElement('form'); form.method = 'POST'; form.action = "{% url 'payment_verify' %}";
+        var csrf = document.createElement('input'); csrf.type = 'hidden'; csrf.name = 'csrfmiddlewaretoken'; csrf.value = '{{ csrf_token }}'; form.appendChild(csrf);
+        ['razorpay_payment_id', 'razorpay_order_id', 'razorpay_signature'].forEach(function(field) {
+            var input = document.createElement('input'); input.type = 'hidden'; input.name = field; input.value = response[field]; form.appendChild(input);
+        });
+        document.body.appendChild(form); form.submit();
+    }, "theme": {"color": "#0a84ff"}
+};
+var rzp1 = new Razorpay(options);
+document.getElementById('rzp-button1').onclick = function(e){ 
+    e.preventDefault(); 
+    {% if request.user.username == 'demo' %}
+        var m = document.getElementById('demoModal');
+        m.style.display = 'flex'; setTimeout(()=>{ m.style.opacity='1'; m.firstElementChild.style.transform='scale(1)'; }, 10);
+    {% else %}
+        rzp1.open(); 
+    {% endif %}
+}
+
+function closeDemo(){
+    var m = document.getElementById('demoModal');
+    m.style.opacity='0'; m.firstElementChild.style.transform='scale(.9)';
+    setTimeout(()=>{ m.style.display='none'; }, 300);
+}
+function payDemo(){
+    var btn = event.target; btn.innerText = "Processing..."; btn.style.opacity = '.7';
+    setTimeout(function(){
+        btn.innerText = "Success!";
+        btn.style.background = "#34c759"; btn.style.boxShadow = "0 12px 26px rgba(52,199,89,.35)";
+        setTimeout(function(){ document.getElementById('rzp-button1').click(); }, 800);
+    }, 1500);
+}
+</script>
+{% endif %}
+{% endblock %}

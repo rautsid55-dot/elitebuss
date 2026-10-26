@@ -1,0 +1,30 @@
+{% extends 'core/base.html' %}
+{% block title %}Sign Up &middot; EliteBuss{% endblock %}
+{% block content %}
+<div class="glass" style="max-width: 480px; margin: 20px auto; padding: 40px 24px;">
+    <h1 style="margin-top:0; font-size:28px; font-weight:800;">Create Account</h1>
+    <p class="muted" style="margin-bottom:24px;">Join EliteBuss today.</p>
+    
+    <form method="post">
+        {% csrf_token %}
+        
+        {% if form.non_field_errors %}
+            <div class="messages"><li class="error">{{ form.non_field_errors|striptags }}</li></div>
+        {% endif %}
+        
+        {% for field in form %}
+        <div class="form-group">
+            <label>{{ field.label }}</label>
+            {{ field }}
+            {% if field.errors %}
+                <div style="color:var(--danger); font-size:13px; margin-top:6px;">{{ field.errors|striptags }}</div>
+            {% endif %}
+        </div>
+        {% endfor %}
+        
+        <button type="submit" class="btn btn-block" style="margin-top:24px; padding:16px; font-size:16px;">Sign Up</button>
+    </form>
+    
+    <p style="margin:20px 0 0; text-align:center; font-size:14px; color:var(--muted);">Already have an account? <a href="{% url 'login' %}">Sign in</a></p>
+</div>
+{% endblock %}
