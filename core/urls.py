@@ -12,6 +12,5 @@ urlpatterns = [
     path('notifications/read/', views.mark_notifications_read, name='mark_notifications_read'),
     path('course/<int:course_id>/', views.course_detail, name='course_detail'),
     path('payment/verify/', views.payment_verify, name='payment_verify'),
-    path('payment/webhook/', views.razorpay_webhook, name='razorpay_webhook'),
     path('dashboard/', views.dashboard, name='dashboard'),
 ]
