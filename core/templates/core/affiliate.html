@@ -11,7 +11,8 @@
     <div class="glass" style="padding:32px; display:flex; flex-direction:column; justify-content:center;">
         <h3 style="margin:0 0 10px; font-size:16px; color:var(--muted);">Your Referral Link</h3>
         <div style="display:flex; gap:10px;">
-            <input type="text" id="refLink" value="http://elitebuss.onrender.com/signup/?ref={{ user.referral_code }}" readonly style="flex:1; background:rgba(255,255,255,.5);">
+            <!-- THIS FIXES THE LOCALHOST LINK -->
+            <input type="text" id="refLink" value="{{ request.scheme }}://{{ request.get_host }}/signup/?ref={{ user.referral_code }}" readonly style="flex:1; background:rgba(255,255,255,.5);">
             <button onclick="navigator.clipboard.writeText(document.getElementById('refLink').value); this.innerText='Copied!'; setTimeout(()=>this.innerText='Copy', 2000);" class="btn">Copy</button>
         </div>
         <p style="margin:10px 0 0; font-size:14px; color:var(--muted);">You have referred <strong>{{ referrals_count }}</strong> users.</p>
