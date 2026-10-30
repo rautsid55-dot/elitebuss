@@ -25,15 +25,15 @@ def index(request):
     site_settings = SiteSetting.load()
     return render(request, 'core/index.html', {'courses': courses, 'settings': site_settings})
 
+def courses_view(request):
+    courses = Course.objects.all().order_by('-created_at')
+    return render(request, 'core/courses.html', {'courses': courses})
+
 @login_required
 def my_learning(request):
     purchases = Purchase.objects.filter(user=request.user, status='Success')
     purchased_courses = [p.course for p in purchases]
     return render(request, 'core/my_learning.html', {'courses': purchased_courses})
-
-def courses_view(request):
-    courses = Course.objects.all().order_by('-created_at')
-    return render(request, 'core/courses.html', {'courses': courses})
 
 def signup_view(request):
     ref_code = request.GET.get('ref', '')
@@ -45,8 +45,16 @@ def signup_view(request):
             if referred_by_code:
                 referrer = CustomUser.objects.filter(referral_code=referred_by_code).first()
                 if referrer: user.referred_by = referrer
+                
+            ip = request.META.get('REMOTE_ADDR')
+            if referred_by_code and ip:
+                existing_ips = CustomUser.objects.filter(signup_ip=ip, referred_by__referral_code=referred_by_code).count()
+                if existing_ips > 0:
+                    SecurityAlert.objects.create(alert_type="Fake Referral", message=f"User {user.username} created from IP {ip} using referral code {referred_by_code} (Potential Fraud).")
+
+            user.signup_ip = ip
             user.save()
-            Wallet.objects.create(user=user) # Create wallet on signup
+            Wallet.objects.create(user=user)
             login(request, user)
             return redirect('index')
         else:
@@ -66,15 +74,6 @@ def login_view(request):
         form = LoginForm()
     return render(request, 'core/login.html', {'form': form})
 
-def terms_view(request):
-    return render(request, 'core/legal.html', {'title': 'Terms & Conditions', 'content': '<h3>1. Acceptance</h3><p>By using EliteBuss, you agree to these terms.</p><h3>2. Content</h3><p>All courses are for personal use only and cannot be resold.</p>'})
-
-def privacy_view(request):
-    return render(request, 'core/legal.html', {'title': 'Privacy Policy', 'content': '<h3>1. Data Collection</h3><p>We collect your email and IP address for security purposes.</p><h3>2. Referrals</h3><p>We track referral IPs to prevent fraud.</p>'})
-
-def refund_view(request):
-    return render(request, 'core/legal.html', {'title': 'Refund Policy', 'content': '<h3>1. Refunds</h3><p>Due to the digital nature of courses, we do not offer refunds once the course is unlocked.</p>'})
-
 def logout_view(request):
     logout(request)
     return redirect('index')
@@ -82,9 +81,6 @@ def logout_view(request):
 @login_required
 def affiliate_view(request):
     wallet, created = Wallet.objects.get_or_create(user=request.user)
-    referrals = ReferralEarning.objects.filter(referrer=request.user).order_by('-created_at') if hasattr(request.user, 'referralearning_set') else []
-    
-    # Get referrals based on user.referrals (CustomUser logic)
     my_referrals = CustomUser.objects.filter(referred_by=request.user)
     referrals_count = my_referrals.count()
     transactions = wallet.transactions.all().order_by('-created_at')
@@ -100,12 +96,11 @@ def affiliate_view(request):
             if amount > wallet.balance:
                 messages.error(request, 'Insufficient balance.')
             elif amount < 100:
-                messages.error(request, 'Minimum withdrawal is Ã¢â€šÂ¹100.')
+                messages.error(request, 'Minimum withdrawal is ₹100.')
             else:
                 WithdrawalRequest.objects.create(user=request.user, amount=amount, payment_method=method, payment_details=details)
                 messages.success(request, 'Withdrawal request submitted successfully! Awaiting admin approval.')
-                # Send notification
-                Notification.objects.create(user=request.user, title="Withdrawal Requested", message=f"Your withdrawal of Ã¢â€šÂ¹{amount} is pending.")
+                Notification.objects.create(user=request.user, title="Withdrawal Requested", message=f"Your withdrawal of ₹{amount} is pending.")
                 return redirect('affiliate')
 
     return render(request, 'core/affiliate.html', {
@@ -144,8 +139,7 @@ def settings_view(request):
             return redirect('settings')
 
     devices = ActiveDevice.objects.filter(user=request.user).order_by('-last_active')
-    unread_notifications = Notification.objects.filter(user=request.user, is_read=False)
-    return render(request, 'core/settings.html', {'devices': devices, 'notifications': unread_notifications})
+    return render(request, 'core/settings.html', {'devices': devices})
 
 @login_required
 def course_detail(request, course_id):
@@ -153,10 +147,8 @@ def course_detail(request, course_id):
     has_purchased = Purchase.objects.filter(user=request.user, course=course, status='Success').exists() or request.user.is_owner
     settings_obj = SiteSetting.load()
     
-    # SECURITY: Do not pass video_url to template unless purchased
     context = {'course': course, 'has_purchased': has_purchased}
     
-    # Coupon Logic
     final_price = course.price
     discount_percent = 0
     coupon_code = request.GET.get('coupon', '')
@@ -216,7 +208,6 @@ def payment_verify(request):
                 purchase.status = 'Success'
                 purchase.save()
                 
-                # REAL REFERRAL LOGIC
                 if purchase.user.referred_by:
                     commission = (purchase.course.price * settings_obj.referral_commission_percentage) / Decimal('100.0')
                     referrer_wallet, _ = Wallet.objects.get_or_create(user=purchase.user.referred_by)
@@ -225,9 +216,9 @@ def payment_verify(request):
                     
                     Transaction.objects.create(
                         wallet=referrer_wallet, amount=commission, transaction_type='Referral',
-                        description=f"Commission from {purchase.user.username}'s purchase of {purchase.course.title}"
+                        description=f"Commission from {purchase.user.username}'s purchase"
                     )
-                    Notification.objects.create(user=purchase.user.referred_by, title="Referral Earning!", message=f"You earned Ã¢â€šÂ¹{commission} from {purchase.user.username}'s purchase.")
+                    Notification.objects.create(user=purchase.user.referred_by, title="Referral Earning!", message=f"You earned ₹{commission} from {purchase.user.username}'s purchase.")
                 
                 messages.success(request, 'Payment verified! Access granted.')
                 return redirect('course_detail', course_id=purchase.course.id)
@@ -269,35 +260,39 @@ def dashboard(request):
                     wr.status = 'Approved'
                     wr.save()
                     Transaction.objects.create(wallet=wallet, amount=-wr.amount, transaction_type='Withdrawal', description=f"Withdrawal to {wr.payment_method} ({wr.payment_details})")
-                    Notification.objects.create(user=wr.user, title="Withdrawal Approved!", message=f"Your withdrawal of Ã¢â€šÂ¹{wr.amount} was approved and sent.")
+                    Notification.objects.create(user=wr.user, title="Withdrawal Approved!", message=f"Your withdrawal of ₹{wr.amount} was approved and sent.")
                     messages.success(request, f'Approved withdrawal for {wr.user.username}.')
                 else:
                     messages.error(request, 'User has insufficient balance.')
         elif action == 'reject_withdrawal':
             wr = WithdrawalRequest.objects.get(id=request.POST.get('withdrawal_id'))
+            reason = request.POST.get('reject_reason', 'No reason provided.')
             wr.status = 'Rejected'
             wr.save()
-            Notification.objects.create(user=wr.user, title="Withdrawal Rejected", message=f"Your withdrawal of Ã¢â€šÂ¹{wr.amount} was rejected. Please contact support.")
+            Notification.objects.create(user=wr.user, title="❌ Withdrawal Rejected", message=f"Your withdrawal of ₹{wr.amount} was rejected. Reason: {reason}")
             messages.success(request, 'Withdrawal rejected.')
         elif action == 'send_notification':
             user = CustomUser.objects.get(id=request.POST.get('user_id'))
             Notification.objects.create(user=user, title=request.POST.get('title'), message=request.POST.get('message'))
-            messages.success(request, 'Notification sent!')
-        return redirect('dashboard')
-
-    if request.method == 'POST':
-        action = request.POST.get('action')
-        if action == 'add_coupon':
+            messages.success(request, f'Notification sent to {user.username}!')
+        elif action == 'broadcast_notification':
+            title = request.POST.get('title')
+            msg = request.POST.get('message')
+            all_users = CustomUser.objects.all()
+            notifications = [Notification(user=u, title=title, message=msg) for u in all_users]
+            Notification.objects.bulk_create(notifications)
+            messages.success(request, f'Broadcast sent to all {len(notifications)} users!')
+        elif action == 'add_coupon':
             Coupon.objects.create(code=request.POST.get('code').upper(), discount_percentage=request.POST.get('discount'))
             messages.success(request, 'Coupon created!')
-            return redirect('dashboard')
         elif action == 'ban_user':
             user = CustomUser.objects.get(id=request.POST.get('user_id'))
             user.is_banned = not user.is_banned
             user.save()
             messages.success(request, 'User ban status updated.')
-            return redirect('dashboard')
             
+        return redirect('dashboard')
+
     users = CustomUser.objects.all().order_by('-date_joined')
     courses = Course.objects.all().order_by('-created_at')
     purchases = Purchase.objects.filter(status='Success')
@@ -316,3 +311,12 @@ def dashboard(request):
 def mark_notifications_read(request):
     Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
     return redirect(request.META.get('HTTP_REFERER', 'index'))
+
+def terms_view(request):
+    return render(request, 'core/legal.html', {'title': 'Terms & Conditions', 'content': '<h3>1. Acceptance</h3><p>By using EliteBuss, you agree to these terms.</p><h3>2. Content</h3><p>All courses are for personal use only and cannot be resold.</p>'})
+
+def privacy_view(request):
+    return render(request, 'core/legal.html', {'title': 'Privacy Policy', 'content': '<h3>1. Data Collection</h3><p>We collect your email and IP address for security purposes.</p><h3>2. Referrals</h3><p>We track referral IPs to prevent fraud.</p>'})
+
+def refund_view(request):
+    return render(request, 'core/legal.html', {'title': 'Refund Policy', 'content': '<h3>1. Refunds</h3><p>Due to the digital nature of courses, we do not offer refunds once the course is unlocked.</p>'})
