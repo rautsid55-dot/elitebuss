@@ -57,6 +57,11 @@ img{max-width:100%;display:block} h1,h2,h3{letter-spacing:-.03em} .muted{color:v
 .nav-links{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
 .nav-links a{padding:10px 16px;border-radius:14px;color:var(--ink);font-weight:600;font-size:14px; transition:background .2s}
 .nav-links a:hover,.nav-links a.active{background:rgba(255,255,255,.3);text-decoration:none}
+.hamburger { display: none; font-size: 24px; cursor: pointer; font-weight: bold; }
+@media(max-width:768px) {
+    .desktop-only { display: none !important; }
+    .hamburger { display: block; }
+}
 
 /* Buttons */
 .btn{--b1:#3aa0ff;--b2:#0a84ff;--b3:#0066d6;position:relative;display:inline-flex;align-items:center;
@@ -69,12 +74,12 @@ img{max-width:100%;display:block} h1,h2,h3{letter-spacing:-.03em} .muted{color:v
 .btn:hover{transform:translateY(-2px);filter:saturate(1.1);text-decoration:none}
 .btn:active{transform:translateY(0) scale(.98)}
 .btn.ghost{background:rgba(255,255,255,.5);color:var(--ink);border:1px solid var(--glass-border);box-shadow:var(--shadow-md),inset 0 1px 0 #fff}
+.btn.danger{--b1:#ff6961;--b2:#ff3b30;--b3:#d92d20;}
 .btn-block{width:100%}
 
-/* Glass Cards */
+/* Glass */
 .glass{background:var(--glass-bg); backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
-  border:var(--glass-border); border-radius:var(--r-lg);
-  box-shadow:var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,.2)}
+  border:var(--glass-border); border-radius:var(--r-lg); box-shadow:var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,.2)}
 .page{width:min(1120px,94vw);margin:32px auto 60px; position:relative}
 
 /* Forms */
@@ -86,17 +91,12 @@ input[type=text],input[type=email],input[type=password],input[type=number],input
   box-shadow:inset 0 1px 3px rgba(16,24,40,.05); transition:all .2s}
 input:focus,select:focus,textarea:focus{outline:none;background:rgba(255,255,255,.9);border-color:rgba(10,132,255,.6); box-shadow:0 0 0 4px rgba(10,132,255,.2)}
 
-/* Settings Tabs */
-.settings-tabs { display:flex; gap:10px; margin-bottom:24px; flex-wrap:wrap; }
-.settings-tab { padding:12px 24px; border-radius:16px; font-weight:700; cursor:pointer; background:rgba(255,255,255,.2); border:1px solid transparent; transition:all .2s; }
-.settings-tab:hover { background:rgba(255,255,255,.4); }
-.settings-tab.active { background:rgba(255,255,255,.8); color:#0a84ff; border-color:rgba(255,255,255,.9); box-shadow:0 4px 12px rgba(0,0,0,.05); }
-body.dark-mode .settings-tab.active { background:rgba(255,255,255,.1); border-color:rgba(255,255,255,.2); }
-.settings-pane { display:none; }
-.settings-pane.active { display:block; animation:fadeIn .3s ease; }
-@keyframes fadeIn { from{opacity:0; transform:translateY(5px)} to{opacity:1; transform:translateY(0)} }
+/* Toasts */
+.toast-container { position: fixed; top: 20px; right: 20px; z-index: 10000; display: flex; flex-direction: column; gap: 10px; }
+.toast { background: var(--glass-bg); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.2); padding: 16px 24px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); font-weight: 600; color: var(--ink); animation: slideIn 0.3s ease forwards; }
+@keyframes slideIn { from{transform:translateX(100%); opacity:0} to{transform:translateX(0); opacity:1} }
 
-/* Draggable Character Widget */
+/* Character */
 .magic-char{position:fixed;bottom:30px;right:30px;z-index:100;display:flex;align-items:flex-end;gap:16px;cursor:grab; user-select:none; touch-action:none; transition:transform .3s ease;}
 .magic-char:active{cursor:grabbing;}
 .magic-bubble{background:var(--glass-bg); backdrop-filter:var(--glass-blur); border:var(--glass-border);
@@ -106,34 +106,16 @@ body.dark-mode .settings-tab.active { background:rgba(255,255,255,.1); border-co
 .magic-char.show .magic-bubble{opacity:1; transform:translateY(0) scale(1)}
 .char-svg{width:120px; height:auto; filter:drop-shadow(0 25px 30px rgba(16,24,40,.3)); pointer-events:none; transition:transform .2s;}
 .char-svg:hover{transform:scale(1.05);}
+@media(max-width:768px){ .char-svg{width:90px;} .magic-bubble{display:none;} }
 
-/* Base responsive adjustments */
-@media(max-width:768px){
-  .nav{top:8px; border-radius:20px; padding:10px 16px;}
-  .page{margin:20px auto 40px;}
-  .char-svg{width:90px;}
-  .magic-bubble{display:none;}
-}
-
-/* Login specific */
 .login-page .nav,.login-page .site-footer,.login-page .bg-mesh,.login-page .magic-char{display:none!important}
 .login-page .page{width:100%;margin:0}
-.login-stage{position:relative;width:100vw;min-height:100dvh;display:flex;align-items:center;justify-content:center;
-  background:radial-gradient(1000px 800px at 50% -10%,#eef4ff 0%,transparent 60%), radial-gradient(800px 600px at 100% 100%,#fdf1ff 0%,transparent 60%),#ffffff;overflow:hidden; padding: 20px;}
-.holder{position:relative;width:min(420px,100%);margin-top:-5vh}
-.card{position:relative;z-index:10;transform-origin:bottom center;transform:scaleX(.05) scaleY(.9);border-radius:48px;overflow:hidden;
-  will-change:transform;min-height:480px;display:flex;flex-direction:column;justify-content:center}
-.card.is-open{animation:unroll 1.4s cubic-bezier(.2,.9,.3,1) forwards}
-@keyframes unroll{0%{transform:scaleX(.05) scaleY(.9);border-radius:48px}50%{transform:scaleX(1.06) scaleY(1.02);border-radius:24px}75%{transform:scaleX(.98) scaleY(.99)}100%{transform:scaleX(1) scaleY(1);border-radius:36px}}
-.card::before{content:"";position:absolute;inset:0;border-radius:inherit;z-index:20;background:linear-gradient(100deg,rgba(255,255,255,.95),rgba(255,255,255,.25) 30%,rgba(255,255,255,.85) 60%,rgba(255,255,255,.3));opacity:1;transition:opacity .6s .3s ease;pointer-events:none}
-.card.is-open::before{opacity:0}
-.card-content{position:relative;padding:32px 24px;opacity:0;transform:translateY(10px);transition:opacity .6s .7s ease,transform .6s .7s ease;z-index:5}
-.card.is-open .card-content{opacity:1;transform:none}
 </style>
 {% block extra_head %}{% endblock %}
 </head>
 <body class="{% block bodyclass %}{% endblock %}">
-<!-- Toast Notifications -->
+
+<!-- Toasts -->
 <div class="toast-container">
     {% for m in messages %}
     <div class="toast">{{ m }}</div>
@@ -142,39 +124,52 @@ body.dark-mode .settings-tab.active { background:rgba(255,255,255,.1); border-co
 <script>
     setTimeout(() => { document.querySelectorAll('.toast').forEach(t => t.remove()); }, 4000);
 </script>
+
+<!-- Background -->
 <div class="bg-mesh" aria-hidden="true"><span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span></div>
 
+<!-- Desktop Nav -->
 <header class="nav">
   <a href="{% url 'index' %}" class="brand"><span class="dot"></span> EliteBuss</a>
   
-  <!-- Hamburger -->
   <div class="hamburger" onclick="document.getElementById('mobileMenu').style.display='flex'">☰</div>
   
   <nav class="nav-links desktop-only">
     <a href="{% url 'index' %}" class="{% if request.resolver_match.url_name == 'index' %}active{% endif %}">Home</a>
     <a href="{% url 'courses' %}" class="{% if request.resolver_match.url_name == 'courses' %}active{% endif %}">Courses</a>
     {% if user.is_authenticated %}
-      <a href="{% url 'my_learning' %}">My Learning</a>
-      <a href="{% url 'affiliate' %}">Wallet</a>
-      <a href="{% url 'settings' %}">Settings</a>
-      {% if user.is_owner %}<a href="{% url 'dashboard' %}" style="color:var(--accent);">Owner Panel</a>{% endif %}
-  <a href="{% url 'index' %}" class="brand"><span class="dot"></span> EliteBuss</a>
-  <nav class="nav-links">
-    <a href="{% url 'index' %}" class="{% if request.resolver_match.url_name == 'index' %}active{% endif %}">Home</a>
-    <a href="{% url 'courses' %}" class="{% if request.resolver_match.url_name == 'courses' %}active{% endif %}">Courses</a>
-    {% if user.is_authenticated %}
-      <a href="{% url 'affiliate' %}" class="{% if request.resolver_match.url_name == 'affiliate' %}active{% endif %}">Affiliate</a>
+      <a href="{% url 'my_learning' %}" class="{% if request.resolver_match.url_name == 'my_learning' %}active{% endif %}">My Learning</a>
+      <a href="{% url 'affiliate' %}" class="{% if request.resolver_match.url_name == 'affiliate' %}active{% endif %}">Wallet</a>
       <a href="{% url 'settings' %}" class="{% if request.resolver_match.url_name == 'settings' %}active{% endif %}">Settings</a>
       {% if user.is_owner %}<a href="{% url 'dashboard' %}" style="color:var(--accent);">Owner Panel</a>{% endif %}
-      <!-- Notification Bell -->
-      <a href="{% url 'mark_notifications_read' %}" style="position:relative; padding:9px 16px; text-decoration:none;">
-          ðŸ””
-          {% if user.notifications.all %}
-          <span style="position:absolute; top:0; right:0; background:#ff3b30; color:white; font-size:10px; font-weight:800; padding:2px 5px; border-radius:10px;">
-              {{ user.notifications.all|length }}
-          </span>
-          {% endif %}
-      </a>
+      
+      <!-- Bell -->
+      <div style="position:relative; display:inline-block;">
+          <div onclick="document.getElementById('notifDropdown').style.display = document.getElementById('notifDropdown').style.display === 'none' ? 'block' : 'none'" style="cursor:pointer; padding:9px 16px; position:relative;">
+              🔔
+              {% if user.notifications.all %}
+              <span style="position:absolute; top:5px; right:8px; background:#ff3b30; color:white; font-size:10px; font-weight:800; padding:2px 5px; border-radius:10px;">
+                  {{ user.notifications.all|length }}
+              </span>
+              {% endif %}
+          </div>
+          <div id="notifDropdown" style="display:none; position:absolute; top:100%; right:0; width:320px; background:var(--glass-bg); backdrop-filter:var(--glass-blur); border:var(--glass-border); border-radius:16px; box-shadow:var(--shadow-lg); z-index:999; max-height:400px; overflow-y:auto;">
+              <div style="padding:16px; border-bottom:1px solid rgba(255,255,255,.2); display:flex; justify-content:space-between; align-items:center;">
+                  <strong style="font-size:14px;">Notifications</strong>
+                  <a href="{% url 'mark_notifications_read' %}" style="font-size:12px; color:#0a84ff; text-decoration:none;">Mark all read</a>
+              </div>
+              {% for notif in user.notifications.all|slice:":10" %}
+              <div style="padding:16px; border-bottom:1px solid rgba(255,255,255,.1); {% if not notif.is_read %}background:rgba(10,132,255,.1);{% endif %}">
+                  <strong style="display:block; font-size:13px; margin-bottom:4px;">{{ notif.title }}</strong>
+                  <p style="margin:0; font-size:12px; color:var(--muted); line-height:1.4;">{{ notif.message }}</p>
+                  <span style="font-size:10px; color:var(--muted); margin-top:6px; display:block;">{{ notif.created_at|timesince }} ago</span>
+              </div>
+              {% empty %}
+              <div style="padding:20px; text-align:center; color:var(--muted); font-size:13px;">No new notifications</div>
+              {% endfor %}
+          </div>
+      </div>
+
       <a href="{% url 'logout' %}" class="btn ghost" style="padding:9px 16px; margin-left:8px;">Sign out</a>
     {% else %}
       <a href="{% url 'login' %}">Sign in</a>
@@ -201,34 +196,14 @@ body.dark-mode .settings-tab.active { background:rgba(255,255,255,.1); border-co
     {% endif %}
 </div>
 
-<style>
-    .hamburger { display: none; font-size: 24px; cursor: pointer; }
-    @media(max-width:768px) {
-        .desktop-only { display: none !important; }
-        .hamburger { display: block; }
-    }
-    .toast-container { position: fixed; top: 20px; right: 20px; z-index: 10000; display: flex; flex-direction: column; gap: 10px; }
-    .toast { background: var(--glass-bg); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.2); padding: 16px 24px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); font-weight: 600; color: var(--ink); animation: slideIn 0.3s ease forwards; }
-    @keyframes slideIn { from{transform:translateX(100%); opacity:0} to{transform:translateX(0); opacity:1} }
-</style>
-{% endblock %}
-
 <main class="page">
-  {% if messages %}
-  <ul class="messages" style="list-style:none; padding:0; margin-bottom:20px;">
-    {% for m in messages %}
-    <li style="padding:14px 18px; border-radius:16px; background:var(--glass-bg); backdrop-filter:blur(20px); border:var(--glass-border); box-shadow:var(--shadow-md); margin-bottom:8px; font-weight:600; color:var(--ink);">{{ m }}</li>
-    {% endfor %}
-  </ul>
-  {% endif %}
   {% block content %}{% endblock %}
 </main>
 
+<!-- Draggable Character -->
 {% block magic_character %}
 <div class="magic-char" id="dragChar">
   <div class="magic-bubble" id="magicText">Drag me anywhere!</div>
-  
-  <!-- Clean, Realistic Cyberpunk Avatar -->
   <svg class="char-svg" viewBox="0 0 200 260">
     <defs>
       <linearGradient id="jacket" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#334155"/><stop offset="1" stop-color="#0f172a"/></linearGradient>
@@ -236,23 +211,18 @@ body.dark-mode .settings-tab.active { background:rgba(255,255,255,.1); border-co
       <linearGradient id="hair" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1e293b"/><stop offset="1" stop-color="#0f172a"/></linearGradient>
       <linearGradient id="neon" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#38bdf8"/><stop offset="1" stop-color="#818cf8"/></linearGradient>
     </defs>
-    <!-- Torso -->
     <path d="M50 260 L50 180 Q50 130 100 130 Q150 130 150 180 L150 260 Z" fill="url(#jacket)"/>
     <path d="M75 130 Q100 170 125 130 Z" fill="#1e293b"/>
     <path d="M100 160 L100 260" stroke="#475569" stroke-width="4"/>
     <path d="M80 135 L100 160 L120 135" stroke="url(#neon)" stroke-width="4" fill="none" stroke-linecap="round"/>
-    <!-- Head -->
     <rect x="85" y="100" width="30" height="35" rx="12" fill="#c48e6b"/>
     <ellipse cx="100" cy="70" rx="42" ry="48" fill="url(#skin)"/>
-    <!-- Hair -->
     <path d="M58 70 Q58 20 100 20 Q142 20 142 70 Q125 50 100 50 Q75 50 58 70 Z" fill="url(#hair)"/>
     <path d="M58 70 Q45 90 55 105 Q60 80 80 60 Z" fill="url(#hair)"/>
     <path d="M142 70 Q155 90 145 105 Q140 80 120 60 Z" fill="url(#hair)"/>
-    <!-- Visor -->
     <path d="M65 65 L135 65 L138 80 Q138 92 110 88 L100 84 L90 88 Q62 92 62 80 Z" fill="#0f172a"/>
     <path d="M70 72 L95 72" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round"/>
     <path d="M105 72 L130 72" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round"/>
-    <!-- Smirk -->
     <path d="M90 100 Q100 110 115 95" stroke="#8c5230" stroke-width="3" fill="none" stroke-linecap="round"/>
   </svg>
 </div>
