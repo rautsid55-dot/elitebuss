@@ -9,6 +9,7 @@ urlpatterns = [
     path('logout/', views.logout_view, name='logout'),
     path('affiliate/', views.affiliate_view, name='affiliate'),
     path('settings/', views.settings_view, name='settings'),
+    path('notifications/read/', views.mark_notifications_read, name='mark_notifications_read'),
     path('course/<int:course_id>/', views.course_detail, name='course_detail'),
     path('payment/verify/', views.payment_verify, name='payment_verify'),
     path('payment/webhook/', views.razorpay_webhook, name='razorpay_webhook'),

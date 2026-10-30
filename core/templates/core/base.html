@@ -144,6 +144,15 @@ body.dark-mode .settings-tab.active { background:rgba(255,255,255,.1); border-co
       <a href="{% url 'affiliate' %}" class="{% if request.resolver_match.url_name == 'affiliate' %}active{% endif %}">Affiliate</a>
       <a href="{% url 'settings' %}" class="{% if request.resolver_match.url_name == 'settings' %}active{% endif %}">Settings</a>
       {% if user.is_owner %}<a href="{% url 'dashboard' %}" style="color:var(--accent);">Owner Panel</a>{% endif %}
+      <!-- Notification Bell -->
+      <a href="{% url 'mark_notifications_read' %}" style="position:relative; padding:9px 16px; text-decoration:none;">
+          🔔
+          {% if user.notifications.all %}
+          <span style="position:absolute; top:0; right:0; background:#ff3b30; color:white; font-size:10px; font-weight:800; padding:2px 5px; border-radius:10px;">
+              {{ user.notifications.all|length }}
+          </span>
+          {% endif %}
+      </a>
       <a href="{% url 'logout' %}" class="btn ghost" style="padding:9px 16px; margin-left:8px;">Sign out</a>
     {% else %}
       <a href="{% url 'login' %}">Sign in</a>

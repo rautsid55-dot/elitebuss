@@ -10,12 +10,10 @@ from django.contrib.auth import login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import HttpResponseBadRequest, HttpResponse
-from django.utils import timezone
 from django.conf import settings
-from .models import Course, Purchase, CustomUser, ReferralEarning, SiteSetting, ActiveDevice
+from .models import *
 from .forms import SignUpForm, LoginForm
 from django.views.decorators.csrf import csrf_exempt
-import resend
 
 def verify_signature(order_id, payment_id, signature, secret):
     msg = f"{order_id}|{payment_id}"
@@ -24,7 +22,8 @@ def verify_signature(order_id, payment_id, signature, secret):
 
 def index(request):
     courses = Course.objects.all().order_by('-created_at')[:3]
-    return render(request, 'core/index.html', {'courses': courses})
+    site_settings = SiteSetting.load()
+    return render(request, 'core/index.html', {'courses': courses, 'settings': site_settings})
 
 def courses_view(request):
     courses = Course.objects.all().order_by('-created_at')
@@ -41,6 +40,7 @@ def signup_view(request):
                 referrer = CustomUser.objects.filter(referral_code=referred_by_code).first()
                 if referrer: user.referred_by = referrer
             user.save()
+            Wallet.objects.create(user=user) # Create wallet on signup
             login(request, user)
             return redirect('index')
         else:
@@ -66,18 +66,43 @@ def logout_view(request):
 
 @login_required
 def affiliate_view(request):
-    referrals = ReferralEarning.objects.filter(referrer=request.user).order_by('-created_at')
-    total_earnings = sum(r.amount for r in referrals)
-    return render(request, 'core/affiliate.html', {'referrals': referrals, 'total_earnings': total_earnings})
+    wallet, created = Wallet.objects.get_or_create(user=request.user)
+    referrals = ReferralEarning.objects.filter(referrer=request.user).order_by('-created_at') if hasattr(request.user, 'referralearning_set') else []
+    
+    # Get referrals based on user.referrals (CustomUser logic)
+    my_referrals = CustomUser.objects.filter(referred_by=request.user)
+    referrals_count = my_referrals.count()
+    transactions = wallet.transactions.all().order_by('-created_at')
+    withdrawals = WithdrawalRequest.objects.filter(user=request.user).order_by('-created_at')
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'request_withdrawal':
+            amount = Decimal(request.POST.get('amount', '0'))
+            method = request.POST.get('method')
+            details = request.POST.get('details')
+            
+            if amount > wallet.balance:
+                messages.error(request, 'Insufficient balance.')
+            elif amount < 100:
+                messages.error(request, 'Minimum withdrawal is ₹100.')
+            else:
+                WithdrawalRequest.objects.create(user=request.user, amount=amount, payment_method=method, payment_details=details)
+                messages.success(request, 'Withdrawal request submitted successfully! Awaiting admin approval.')
+                # Send notification
+                Notification.objects.create(user=request.user, title="Withdrawal Requested", message=f"Your withdrawal of ₹{amount} is pending.")
+                return redirect('affiliate')
+
+    return render(request, 'core/affiliate.html', {
+        'wallet': wallet, 'my_referrals': my_referrals, 'referrals_count': referrals_count,
+        'transactions': transactions, 'withdrawals': withdrawals
+    })
 
 @login_required
 def settings_view(request):
     if not ActiveDevice.objects.filter(session_key=request.session.session_key).exists():
         device_name = request.META.get('HTTP_USER_AGENT', 'Unknown Device')[:50]
-        ActiveDevice.objects.create(
-            user=request.user, session_key=request.session.session_key,
-            device_name=device_name, ip_address=request.META.get('REMOTE_ADDR')
-        )
+        ActiveDevice.objects.create(user=request.user, session_key=request.session.session_key, device_name=device_name, ip_address=request.META.get('REMOTE_ADDR'))
 
     if request.method == 'POST':
         action = request.POST.get('action')
@@ -86,53 +111,26 @@ def settings_view(request):
             request.user.email = request.POST.get('email')
             request.user.save()
             messages.success(request, 'Profile updated successfully!')
-        
-        elif action == 'request_otp':
-            otp = ''.join(random.choices(string.digits, k=6))
-            request.session['password_reset_otp'] = otp
-            
-            subject = 'Your EliteBuss Password Reset OTP'
-            message = f'Hello {request.user.username},\n\nYour 6-digit OTP to change your password is:\n\n{otp}\n\nIf you did not request this, please ignore this email.\n\nThanks,\nEliteBuss Team'
-            
-            try:
-                resend.api_key = settings.RESEND_API_KEY
-                # Send to the exact email of the logged-in user
-                recipient = request.user.email
-                params = {
-                    "from": "EliteBuss <onboarding@resend.dev>",
-                    "to": [recipient],
-                    "subject": subject,
-                    "text": message
-                }
-                resend.Emails.send(params)
-                messages.success(request, f'OTP sent successfully to {recipient}!')
-            except Exception as e:
-                messages.error(request, f'Email API Error: {str(e)}')
-            return redirect('settings')
-            
-        elif action == 'verify_otp':
-            entered_otp = request.POST.get('otp')
-            if entered_otp == request.session.get('password_reset_otp'):
-                new_password = request.POST.get('new_password')
+        elif action == 'change_password':
+            new_password = request.POST.get('new_password')
+            confirm_password = request.POST.get('confirm_password')
+            if new_password == confirm_password and len(new_password) >= 6:
                 request.user.set_password(new_password)
                 request.user.save()
                 update_session_auth_hash(request, request.user)
-                del request.session['password_reset_otp']
                 messages.success(request, 'Password changed successfully!')
             else:
-                messages.error(request, 'Invalid OTP. Try again.')
+                messages.error(request, 'Passwords do not match or are too short.')
             return redirect('settings')
-            
         elif action == 'logout_device':
-            device_id = request.POST.get('device_id')
-            device = ActiveDevice.objects.filter(id=device_id, user=request.user).first()
-            if device:
-                device.delete()
-                messages.success(request, 'Device logged out.')
+            device = ActiveDevice.objects.filter(id=request.POST.get('device_id'), user=request.user).first()
+            if device: device.delete()
+            messages.success(request, 'Device logged out.')
             return redirect('settings')
 
     devices = ActiveDevice.objects.filter(user=request.user).order_by('-last_active')
-    return render(request, 'core/settings.html', {'devices': devices})
+    unread_notifications = Notification.objects.filter(user=request.user, is_read=False)
+    return render(request, 'core/settings.html', {'devices': devices, 'notifications': unread_notifications})
 
 @login_required
 def course_detail(request, course_id):
@@ -144,7 +142,7 @@ def course_detail(request, course_id):
     if not has_purchased:
         if request.user.username == 'demo':
             Purchase.objects.create(user=request.user, course=course, status='Success')
-            messages.success(request, 'Demo Payment Successful! Access granted.')
+            messages.success(request, 'Demo Payment Successful!')
             return redirect('course_detail', course_id=course.id)
             
         if not settings_obj.razorpay_key_id or not settings_obj.razorpay_key_secret:
@@ -164,11 +162,8 @@ def course_detail(request, course_id):
                     context['order_amount'] = order_amount
                 else:
                     context['payment_disabled'] = True
-                    messages.error(request, "Gateway awaiting valid live/test Razorpay keys.")
             except Exception:
                 context['payment_disabled'] = True
-                messages.error(request, "Network error reaching payment gateway.")
-
     return render(request, 'core/course_detail.html', context)
 
 @csrf_exempt
@@ -187,77 +182,88 @@ def payment_verify(request):
                 purchase.razorpay_signature = signature
                 purchase.status = 'Success'
                 purchase.save()
+                
+                # REAL REFERRAL LOGIC
                 if purchase.user.referred_by:
                     commission = (purchase.course.price * settings_obj.referral_commission_percentage) / Decimal('100.0')
-                    ReferralEarning.objects.create(referrer=purchase.user.referred_by, purchase=purchase, amount=commission)
-                messages.success(request, 'Payment verified! You now have lifetime access.')
+                    referrer_wallet, _ = Wallet.objects.get_or_create(user=purchase.user.referred_by)
+                    referrer_wallet.balance += commission
+                    referrer_wallet.save()
+                    
+                    Transaction.objects.create(
+                        wallet=referrer_wallet, amount=commission, transaction_type='Referral',
+                        description=f"Commission from {purchase.user.username}'s purchase of {purchase.course.title}"
+                    )
+                    Notification.objects.create(user=purchase.user.referred_by, title="Referral Earning!", message=f"You earned ₹{commission} from {purchase.user.username}'s purchase.")
+                
+                messages.success(request, 'Payment verified! Access granted.')
                 return redirect('course_detail', course_id=purchase.course.id)
-        messages.error(request, 'Payment verification failed.')
         return redirect('index')
-    return HttpResponseBadRequest()
-
-@csrf_exempt
-def razorpay_webhook(request):
-    if request.method == 'POST':
-        settings_obj = SiteSetting.load()
-        webhook_secret = settings_obj.razorpay_webhook_secret
-        if not webhook_secret:
-            return HttpResponse(status=400)
-        webhook_signature = request.headers.get('X-Razorpay-Signature', '')
-        payload = request.body.decode('utf-8')
-        generated_sig = hmac.new(webhook_secret.encode('utf-8'), payload.encode('utf-8'), hashlib.sha256).hexdigest()
-        if hmac.compare_digest(generated_sig, webhook_signature):
-            data = json.loads(payload)
-            if data.get('event') == 'order.paid':
-                order_id = data['payload']['order']['entity']['id']
-                payment_id = data['payload']['payment']['entity']['id']
-                purchase = Purchase.objects.filter(razorpay_order_id=order_id).first()
-                if purchase and purchase.status != 'Success':
-                    purchase.razorpay_payment_id = payment_id
-                    purchase.status = 'Success'
-                    purchase.save()
-            return HttpResponse(status=200)
-        return HttpResponse(status=400)
     return HttpResponseBadRequest()
 
 @login_required
 def dashboard(request):
     if not request.user.is_owner:
         return redirect('index')
+    
     site_settings = SiteSetting.load()
     if request.method == "POST":
         action = request.POST.get('action')
         if action == 'save_settings':
             site_settings.razorpay_key_id = request.POST.get('razorpay_key_id', '').strip()
             site_settings.razorpay_key_secret = request.POST.get('razorpay_key_secret', '').strip()
-            site_settings.razorpay_webhook_secret = request.POST.get('razorpay_webhook_secret', '').strip()
+            site_settings.hero_title = request.POST.get('hero_title')
+            site_settings.hero_description = request.POST.get('hero_description')
             try: site_settings.referral_commission_percentage = Decimal(request.POST.get('commission', '10'))
             except: pass
             site_settings.save()
-            messages.success(request, 'Razorpay & Referral settings saved!')
+            messages.success(request, 'Settings saved!')
         elif action == 'add_course':
-            title = request.POST.get('title', '').strip()
-            price = request.POST.get('price', '0').strip()
-            if title and price:
-                Course.objects.create(
-                    title=title, description=request.POST.get('description', '').strip(),
-                    price=Decimal(price), thumbnail_url=request.POST.get('thumbnail_url', '').strip(),
-                    video_url=request.POST.get('video_url', '').strip()
-                )
-                messages.success(request, f'Course "{title}" added!')
+            Course.objects.create(
+                title=request.POST.get('title'), description=request.POST.get('description'),
+                price=Decimal(request.POST.get('price')), thumbnail_url=request.POST.get('thumbnail_url'), video_url=request.POST.get('video_url')
+            )
+            messages.success(request, 'Course added!')
         elif action == 'delete_course':
             Course.objects.filter(id=request.POST.get('course_id')).delete()
-            messages.success(request, 'Course removed.')
+        elif action == 'approve_withdrawal':
+            wr = WithdrawalRequest.objects.get(id=request.POST.get('withdrawal_id'))
+            if wr.status == 'Pending':
+                wallet = wr.user.wallet
+                if wallet.balance >= wr.amount:
+                    wallet.balance -= wr.amount
+                    wallet.save()
+                    wr.status = 'Approved'
+                    wr.save()
+                    Transaction.objects.create(wallet=wallet, amount=-wr.amount, transaction_type='Withdrawal', description=f"Withdrawal to {wr.payment_method} ({wr.payment_details})")
+                    Notification.objects.create(user=wr.user, title="Withdrawal Approved!", message=f"Your withdrawal of ₹{wr.amount} was approved and sent.")
+                    messages.success(request, f'Approved withdrawal for {wr.user.username}.')
+                else:
+                    messages.error(request, 'User has insufficient balance.')
+        elif action == 'reject_withdrawal':
+            wr = WithdrawalRequest.objects.get(id=request.POST.get('withdrawal_id'))
+            wr.status = 'Rejected'
+            wr.save()
+            Notification.objects.create(user=wr.user, title="Withdrawal Rejected", message=f"Your withdrawal of ₹{wr.amount} was rejected. Please contact support.")
+            messages.success(request, 'Withdrawal rejected.')
+        elif action == 'send_notification':
+            user = CustomUser.objects.get(id=request.POST.get('user_id'))
+            Notification.objects.create(user=user, title=request.POST.get('title'), message=request.POST.get('message'))
+            messages.success(request, 'Notification sent!')
         return redirect('dashboard')
 
-    users = CustomUser.objects.all()
+    users = CustomUser.objects.all().order_by('-date_joined')
     courses = Course.objects.all().order_by('-created_at')
     purchases = Purchase.objects.filter(status='Success')
-    context = {
-        'users': users, 'courses': courses,
-        'total_revenue': sum(p.course.price for p in purchases),
-        'purchases_count': purchases.count(),
-        'referrals_paid': sum(r.amount for r in ReferralEarning.objects.all()),
-        'settings': site_settings
-    }
-    return render(request, 'core/dashboard.html', context)
+    withdrawals = WithdrawalRequest.objects.all().order_by('-created_at')
+    total_revenue = sum(p.course.price for p in purchases)
+    
+    return render(request, 'core/dashboard.html', {
+        'users': users, 'courses': courses, 'total_revenue': total_revenue,
+        'purchases_count': purchases.count(), 'withdrawals': withdrawals, 'settings': site_settings
+    })
+
+@login_required
+def mark_notifications_read(request):
+    Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
+    return redirect(request.META.get('HTTP_REFERER', 'index'))

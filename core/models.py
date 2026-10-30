@@ -1,38 +1,24 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
-import uuid
-
-class SiteSetting(models.Model):
-    razorpay_key_id = models.CharField(max_length=150, blank=True, null=True)
-    razorpay_key_secret = models.CharField(max_length=150, blank=True, null=True)
-    razorpay_webhook_secret = models.CharField(max_length=150, blank=True, null=True)
-    referral_commission_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=10.00)
-    
-    def save(self, *args, **kwargs):
-        self.pk = 1
-        super(SiteSetting, self).save(*args, **kwargs)
-
-    @classmethod
-    def load(cls):
-        obj, created = cls.objects.get_or_create(pk=1)
-        return obj
+from django.utils.crypto import get_random_string
+from decimal import Decimal
 
 class CustomUser(AbstractUser):
     is_owner = models.BooleanField(default=False)
-    referral_code = models.CharField(max_length=20, unique=True, blank=True, null=True)
-    referred_by = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True)
-
+    referral_code = models.CharField(max_length=10, unique=True, blank=True)
+    referred_by = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='referrals')
+    
     def save(self, *args, **kwargs):
         if not self.referral_code:
-            self.referral_code = str(uuid.uuid4()).replace('-', '')[:10].upper()
+            self.referral_code = get_random_string(10).upper()
         super().save(*args, **kwargs)
 
 class Course(models.Model):
     title = models.CharField(max_length=200)
     description = models.TextField()
     price = models.DecimalField(max_digits=10, decimal_places=2)
-    thumbnail_url = models.URLField()
-    video_url = models.URLField()
+    thumbnail_url = models.URLField(blank=True, null=True)
+    video_url = models.URLField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -41,17 +27,53 @@ class Course(models.Model):
 class Purchase(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
-    razorpay_order_id = models.CharField(max_length=100)
-    razorpay_payment_id = models.CharField(max_length=100, null=True, blank=True)
-    razorpay_signature = models.CharField(max_length=200, null=True, blank=True)
-    status = models.CharField(max_length=20, default='Pending') # Pending, Success
+    razorpay_order_id = models.CharField(max_length=100, blank=True, null=True)
+    razorpay_payment_id = models.CharField(max_length=100, blank=True, null=True)
+    razorpay_signature = models.CharField(max_length=200, blank=True, null=True)
+    status = models.CharField(max_length=20, default='Pending')
     created_at = models.DateTimeField(auto_now_add=True)
 
-class ReferralEarning(models.Model):
-    referrer = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
-    purchase = models.ForeignKey(Purchase, on_delete=models.CASCADE)
+class Wallet(models.Model):
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='wallet')
+    balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+
+    def __str__(self):
+        return f"{self.user.username} - ₹{self.balance}"
+
+class Transaction(models.Model):
+    wallet = models.ForeignKey(Wallet, on_delete=models.CASCADE, related_name='transactions')
     amount = models.DecimalField(max_digits=10, decimal_places=2)
+    transaction_type = models.CharField(max_length=20, choices=[('Referral', 'Referral Bonus'), ('Withdrawal', 'Withdrawal')])
+    description = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
+
+class WithdrawalRequest(models.Model):
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    payment_method = models.CharField(max_length=50) # UPI, Bank
+    payment_details = models.CharField(max_length=200) # UPI ID or Bank Acc
+    status = models.CharField(max_length=20, default='Pending') # Pending, Approved, Rejected
+    created_at = models.DateTimeField(auto_now_add=True)
+
+class Notification(models.Model):
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='notifications')
+    title = models.CharField(max_length=100)
+    message = models.TextField()
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+class SiteSetting(models.Model):
+    razorpay_key_id = models.CharField(max_length=100, blank=True, null=True)
+    razorpay_key_secret = models.CharField(max_length=100, blank=True, null=True)
+    razorpay_webhook_secret = models.CharField(max_length=100, blank=True, null=True)
+    referral_commission_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=10.00)
+    hero_title = models.CharField(max_length=200, default="Elevate Your Skills.")
+    hero_description = models.TextField(default="Join EliteBuss to access premium courses.")
+
+    @classmethod
+    def load(cls):
+        obj, _ = cls.objects.get_or_create(id=1)
+        return obj
 
 class ActiveDevice(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='devices')
@@ -59,6 +81,3 @@ class ActiveDevice(models.Model):
     device_name = models.CharField(max_length=100)
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     last_active = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return f"{self.user.username} - {self.device_name}"
