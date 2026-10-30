@@ -1,0 +1,11 @@
+{% extends 'core/base.html' %}
+{% block title %}Legal &middot; EliteBuss{% endblock %}
+{% block content %}
+<div class="glass" style="padding:48px; max-width:800px; margin:0 auto;">
+    <h1>{{ title }}</h1>
+    <p class="muted">Last updated: Today</p>
+    <div style="margin-top:32px; line-height:1.8; color:var(--muted);">
+        {{ content|safe }}
+    </div>
+</div>
+{% endblock %}

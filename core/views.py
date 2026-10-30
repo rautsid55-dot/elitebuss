@@ -25,6 +25,12 @@ def index(request):
     site_settings = SiteSetting.load()
     return render(request, 'core/index.html', {'courses': courses, 'settings': site_settings})
 
+@login_required
+def my_learning(request):
+    purchases = Purchase.objects.filter(user=request.user, status='Success')
+    purchased_courses = [p.course for p in purchases]
+    return render(request, 'core/my_learning.html', {'courses': purchased_courses})
+
 def courses_view(request):
     courses = Course.objects.all().order_by('-created_at')
     return render(request, 'core/courses.html', {'courses': courses})
@@ -60,6 +66,15 @@ def login_view(request):
         form = LoginForm()
     return render(request, 'core/login.html', {'form': form})
 
+def terms_view(request):
+    return render(request, 'core/legal.html', {'title': 'Terms & Conditions', 'content': '<h3>1. Acceptance</h3><p>By using EliteBuss, you agree to these terms.</p><h3>2. Content</h3><p>All courses are for personal use only and cannot be resold.</p>'})
+
+def privacy_view(request):
+    return render(request, 'core/legal.html', {'title': 'Privacy Policy', 'content': '<h3>1. Data Collection</h3><p>We collect your email and IP address for security purposes.</p><h3>2. Referrals</h3><p>We track referral IPs to prevent fraud.</p>'})
+
+def refund_view(request):
+    return render(request, 'core/legal.html', {'title': 'Refund Policy', 'content': '<h3>1. Refunds</h3><p>Due to the digital nature of courses, we do not offer refunds once the course is unlocked.</p>'})
+
 def logout_view(request):
     logout(request)
     return redirect('index')
@@ -85,12 +100,12 @@ def affiliate_view(request):
             if amount > wallet.balance:
                 messages.error(request, 'Insufficient balance.')
             elif amount < 100:
-                messages.error(request, 'Minimum withdrawal is ₹100.')
+                messages.error(request, 'Minimum withdrawal is Ã¢â€šÂ¹100.')
             else:
                 WithdrawalRequest.objects.create(user=request.user, amount=amount, payment_method=method, payment_details=details)
                 messages.success(request, 'Withdrawal request submitted successfully! Awaiting admin approval.')
                 # Send notification
-                Notification.objects.create(user=request.user, title="Withdrawal Requested", message=f"Your withdrawal of ₹{amount} is pending.")
+                Notification.objects.create(user=request.user, title="Withdrawal Requested", message=f"Your withdrawal of Ã¢â€šÂ¹{amount} is pending.")
                 return redirect('affiliate')
 
     return render(request, 'core/affiliate.html', {
@@ -137,7 +152,25 @@ def course_detail(request, course_id):
     course = get_object_or_404(Course, id=course_id)
     has_purchased = Purchase.objects.filter(user=request.user, course=course, status='Success').exists() or request.user.is_owner
     settings_obj = SiteSetting.load()
+    
+    # SECURITY: Do not pass video_url to template unless purchased
     context = {'course': course, 'has_purchased': has_purchased}
+    
+    # Coupon Logic
+    final_price = course.price
+    discount_percent = 0
+    coupon_code = request.GET.get('coupon', '')
+    if coupon_code:
+        coupon = Coupon.objects.filter(code=coupon_code, is_active=True).first()
+        if coupon:
+            discount_percent = coupon.discount_percentage
+            final_price = course.price - (course.price * Decimal(discount_percent) / Decimal('100.0'))
+            messages.success(request, f'Coupon applied! {discount_percent}% off.')
+        else:
+            messages.error(request, 'Invalid or expired coupon.')
+    
+    context['final_price'] = final_price
+    context['discount_percent'] = discount_percent
 
     if not has_purchased:
         if request.user.username == 'demo':
@@ -149,14 +182,14 @@ def course_detail(request, course_id):
             context['payment_disabled'] = True
         else:
             context['payment_disabled'] = False
-            order_amount = int(course.price * 100)
+            order_amount = int(final_price * 100)
             auth = (settings_obj.razorpay_key_id, settings_obj.razorpay_key_secret)
             payload = {'amount': order_amount, 'currency': 'INR', 'payment_capture': 1}
             try:
                 response = requests.post("https://api.razorpay.com/v1/orders", auth=auth, json=payload, timeout=10)
                 if response.status_code == 200:
                     razorpay_order = response.json()
-                    Purchase.objects.create(user=request.user, course=course, razorpay_order_id=razorpay_order['id'], status='Pending')
+                    Purchase.objects.create(user=request.user, course=course, razorpay_order_id=razorpay_order['id'], status='Pending', discount_applied=discount_percent)
                     context['razorpay_order_id'] = razorpay_order['id']
                     context['razorpay_merchant_key'] = settings_obj.razorpay_key_id
                     context['order_amount'] = order_amount
@@ -194,7 +227,7 @@ def payment_verify(request):
                         wallet=referrer_wallet, amount=commission, transaction_type='Referral',
                         description=f"Commission from {purchase.user.username}'s purchase of {purchase.course.title}"
                     )
-                    Notification.objects.create(user=purchase.user.referred_by, title="Referral Earning!", message=f"You earned ₹{commission} from {purchase.user.username}'s purchase.")
+                    Notification.objects.create(user=purchase.user.referred_by, title="Referral Earning!", message=f"You earned Ã¢â€šÂ¹{commission} from {purchase.user.username}'s purchase.")
                 
                 messages.success(request, 'Payment verified! Access granted.')
                 return redirect('course_detail', course_id=purchase.course.id)
@@ -236,7 +269,7 @@ def dashboard(request):
                     wr.status = 'Approved'
                     wr.save()
                     Transaction.objects.create(wallet=wallet, amount=-wr.amount, transaction_type='Withdrawal', description=f"Withdrawal to {wr.payment_method} ({wr.payment_details})")
-                    Notification.objects.create(user=wr.user, title="Withdrawal Approved!", message=f"Your withdrawal of ₹{wr.amount} was approved and sent.")
+                    Notification.objects.create(user=wr.user, title="Withdrawal Approved!", message=f"Your withdrawal of Ã¢â€šÂ¹{wr.amount} was approved and sent.")
                     messages.success(request, f'Approved withdrawal for {wr.user.username}.')
                 else:
                     messages.error(request, 'User has insufficient balance.')
@@ -244,7 +277,7 @@ def dashboard(request):
             wr = WithdrawalRequest.objects.get(id=request.POST.get('withdrawal_id'))
             wr.status = 'Rejected'
             wr.save()
-            Notification.objects.create(user=wr.user, title="Withdrawal Rejected", message=f"Your withdrawal of ₹{wr.amount} was rejected. Please contact support.")
+            Notification.objects.create(user=wr.user, title="Withdrawal Rejected", message=f"Your withdrawal of Ã¢â€šÂ¹{wr.amount} was rejected. Please contact support.")
             messages.success(request, 'Withdrawal rejected.')
         elif action == 'send_notification':
             user = CustomUser.objects.get(id=request.POST.get('user_id'))
@@ -252,15 +285,31 @@ def dashboard(request):
             messages.success(request, 'Notification sent!')
         return redirect('dashboard')
 
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'add_coupon':
+            Coupon.objects.create(code=request.POST.get('code').upper(), discount_percentage=request.POST.get('discount'))
+            messages.success(request, 'Coupon created!')
+            return redirect('dashboard')
+        elif action == 'ban_user':
+            user = CustomUser.objects.get(id=request.POST.get('user_id'))
+            user.is_banned = not user.is_banned
+            user.save()
+            messages.success(request, 'User ban status updated.')
+            return redirect('dashboard')
+            
     users = CustomUser.objects.all().order_by('-date_joined')
     courses = Course.objects.all().order_by('-created_at')
     purchases = Purchase.objects.filter(status='Success')
     withdrawals = WithdrawalRequest.objects.all().order_by('-created_at')
+    alerts = SecurityAlert.objects.filter(is_resolved=False).order_by('-created_at')
+    coupons = Coupon.objects.all()
     total_revenue = sum(p.course.price for p in purchases)
     
     return render(request, 'core/dashboard.html', {
         'users': users, 'courses': courses, 'total_revenue': total_revenue,
-        'purchases_count': purchases.count(), 'withdrawals': withdrawals, 'settings': site_settings
+        'purchases_count': purchases.count(), 'withdrawals': withdrawals, 
+        'settings': site_settings, 'alerts': alerts, 'coupons': coupons
     })
 
 @login_required

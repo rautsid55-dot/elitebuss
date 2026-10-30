@@ -20,7 +20,7 @@
 <!-- Overview Tab -->
 <div id="tab-overview" class="settings-pane active">
     <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:20px; margin-bottom:32px;">
-        <div class="glass" style="padding:24px;"><h3 style="margin:0 0 8px; font-size:12px; text-transform:uppercase; color:var(--muted);">Total Revenue</h3><h2 style="margin:0; font-size:32px;">₹{{ total_revenue }}</h2></div>
+        <div class="glass" style="padding:24px;"><h3 style="margin:0 0 8px; font-size:12px; text-transform:uppercase; color:var(--muted);">Total Revenue</h3><h2 style="margin:0; font-size:32px;">â‚¹{{ total_revenue }}</h2></div>
         <div class="glass" style="padding:24px;"><h3 style="margin:0 0 8px; font-size:12px; text-transform:uppercase; color:var(--muted);">Sales</h3><h2 style="margin:0; font-size:32px;">{{ purchases_count }}</h2></div>
         <div class="glass" style="padding:24px;"><h3 style="margin:0 0 8px; font-size:12px; text-transform:uppercase; color:var(--muted);">Users</h3><h2 style="margin:0; font-size:32px;">{{ users.count }}</h2></div>
     </div>
@@ -35,7 +35,7 @@
             {% for w in withdrawals %}
             <tr style="border-bottom:1px solid rgba(255,255,255,.1);">
                 <td style="padding:16px 0;">{{ w.user.username }}</td>
-                <td>₹{{ w.amount }}</td>
+                <td>â‚¹{{ w.amount }}</td>
                 <td>{{ w.payment_method }}</td>
                 <td>{{ w.payment_details }}</td>
                 <td><span style="padding:4px 8px; border-radius:6px; font-size:12px; font-weight:800; background:{% if w.status == 'Pending' %}#fbbf24{% elif w.status == 'Approved' %}#34c759{% else %}#ff3b30{% endif %}; color:black;">{{ w.status }}</span></td>
@@ -87,7 +87,7 @@
 <!-- Courses Tab -->
 <div id="tab-courses" class="settings-pane">
     <div class="glass" style="padding:32px; margin-bottom:24px;">
-        <h2 style="margin-top:0;">➕ Add New Course</h2>
+        <h2 style="margin-top:0;">âž• Add New Course</h2>
         <form method="POST" style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-top:20px;">
             {% csrf_token %}
             <input type="hidden" name="action" value="add_course">
@@ -106,10 +106,57 @@
             {% for c in courses %}
             <tr style="border-bottom:1px solid rgba(255,255,255,.1);">
                 <td style="padding:16px 0;">{{ c.title }}</td>
-                <td>₹{{ c.price }}</td>
+                <td>â‚¹{{ c.price }}</td>
                 <td>
                     <form method="POST">{% csrf_token %}<input type="hidden" name="action" value="delete_course"><input type="hidden" name="course_id" value="{{ c.id }}"><button type="submit" class="btn danger" style="padding:6px 12px; font-size:12px;">Delete</button></form>
                 </td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+</div>
+
+<!-- Security Tab -->
+<div id="tab-security" class="settings-pane">
+    <div class="glass" style="padding:32px;">
+        <h2 style="margin-top:0;">🚨 Security Alerts</h2>
+        <p class="muted">System detected potential fraud or fake referrals.</p>
+        <table style="width:100%; border-collapse:collapse; margin-top:20px;">
+            <tr style="text-align:left; border-bottom:1px solid rgba(255,255,255,.2);"><th>Type</th><th>Details</th><th>Action</th></tr>
+            {% for a in alerts %}
+            <tr style="border-bottom:1px solid rgba(255,255,255,.1);">
+                <td style="padding:16px 0; color:#ff3b30; font-weight:700;">{{ a.alert_type }}</td>
+                <td>{{ a.message }}</td>
+                <td><button class="btn ghost" style="padding:6px 12px; font-size:12px;">Dismiss</button></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="3" style="text-align:center; color:#34c759; padding:20px;">No security alerts. System is safe.</td></tr>
+            {% endfor %}
+        </table>
+    </div>
+</div>
+
+<!-- Coupons Tab -->
+<div id="tab-coupons" class="settings-pane">
+    <div class="glass" style="padding:32px; margin-bottom:24px;">
+        <h2 style="margin-top:0;">🎟️ Create Coupon</h2>
+        <form method="POST" style="display:flex; gap:10px; margin-top:16px;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_coupon">
+            <input type="text" name="code" placeholder="Code (e.g., NEW50)" required style="flex:1;">
+            <input type="number" name="discount" placeholder="Discount %" required style="width:120px;">
+            <button type="submit" class="btn">Generate</button>
+        </form>
+    </div>
+    <div class="glass" style="padding:32px;">
+        <h2 style="margin-top:0;">Active Coupons</h2>
+        <table style="width:100%; border-collapse:collapse; margin-top:20px;">
+            <tr style="text-align:left; border-bottom:1px solid rgba(255,255,255,.2);"><th>Code</th><th>Discount</th><th>Status</th></tr>
+            {% for c in coupons %}
+            <tr style="border-bottom:1px solid rgba(255,255,255,.1);">
+                <td style="padding:16px 0; font-weight:700;">{{ c.code }}</td>
+                <td>{{ c.discount_percentage }}% OFF</td>
+                <td><span style="color:#34c759;">Active</span></td>
             </tr>
             {% endfor %}
         </table>

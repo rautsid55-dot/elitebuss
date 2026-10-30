@@ -4,8 +4,12 @@ from . import views
 urlpatterns = [
     path('', views.index, name='index'),
     path('courses/', views.courses_view, name='courses'),
+    path('my-learning/', views.my_learning, name='my_learning'),
     path('signup/', views.signup_view, name='signup'),
     path('login/', views.login_view, name='login'),
+    path('terms/', views.terms_view, name='terms'),
+    path('privacy/', views.privacy_view, name='privacy'),
+    path('refund/', views.refund_view, name='refund'),
     path('logout/', views.logout_view, name='logout'),
     path('affiliate/', views.affiliate_view, name='affiliate'),
     path('settings/', views.settings_view, name='settings'),
