@@ -1,22 +1,100 @@
 {% extends 'core/base.html' %}
 {% block title %}Sign in &middot; EliteBuss{% endblock %}
 {% block bodyclass %}login-page{% endblock %}
+
+{% block extra_head %}
+<style>
+/* Login Page Specific CSS */
+.login-page .nav, .login-page .site-footer, .login-page .bg-mesh, .login-page .magic-char { display: none !important; }
+.login-page .page { width: 100%; margin: 0; }
+
+.login-stage {
+    position: relative; width: 100vw; min-height: 100dvh; display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(1000px 800px at 50% -10%, #eef4ff 0%, transparent 60%), 
+                radial-gradient(800px 600px at 100% 100%, #fdf1ff 0%, transparent 60%), #ffffff;
+    overflow: hidden; padding: 20px;
+}
+.holder {
+    position: relative; width: min(420px, 92vw); margin-top: -5vh; z-index: 10;
+}
+
+/* The Poster Card */
+.card {
+    position: relative; z-index: 10; transform-origin: bottom center; transform: scaleX(.05) scaleY(.9);
+    border-radius: 48px; overflow: hidden; will-change: transform; min-height: 480px;
+    display: flex; flex-direction: column; justify-content: center; background: rgba(255,255,255,0.7);
+    backdrop-filter: blur(40px); border: 1px solid rgba(255,255,255,0.8); box-shadow: 0 30px 80px rgba(16,24,40,.15);
+}
+.card.is-open { animation: unroll 1.4s cubic-bezier(.2,.9,.3,1) forwards; }
+@keyframes unroll {
+    0% { transform: scaleX(.05) scaleY(.9); border-radius: 48px; }
+    50% { transform: scaleX(1.06) scaleY(1.02); border-radius: 24px; }
+    75% { transform: scaleX(.98) scaleY(.99); }
+    100% { transform: scaleX(1) scaleY(1); border-radius: 36px; }
+}
+.card::before {
+    content: ""; position: absolute; inset: 0; border-radius: inherit; z-index: 20;
+    background: linear-gradient(100deg, rgba(255,255,255,.95), rgba(255,255,255,.25) 30%, rgba(255,255,255,.85) 60%, rgba(255,255,255,.3));
+    opacity: 1; transition: opacity .6s .3s ease; pointer-events: none;
+}
+.card.is-open::before { opacity: 0; }
+.card-content {
+    position: relative; padding: 40px 32px; opacity: 0; transform: translateY(10px);
+    transition: opacity .6s .7s ease, transform .6s .7s ease; z-index: 5;
+}
+.card.is-open .card-content { opacity: 1; transform: none; }
+
+/* Input Fixes */
+.login-page input[type="text"], .login-page input[type="password"] {
+    width: 100%; padding: 15px 18px; margin-bottom: 16px; border-radius: 16px;
+    background: rgba(255,255,255,0.6); border: 1px solid rgba(255,255,255,0.9);
+}
+
+/* The Character */
+.login-boy {
+    position: absolute; left: 50%; bottom: -180px; transform: translateX(-50%);
+    width: min(260px, 75vw); pointer-events: none; z-index: 5; opacity: 0;
+    transition: opacity .8s ease, transform .8s ease; filter: drop-shadow(0 30px 40px rgba(16,24,40,.25));
+}
+.login-stage.ready .login-boy { opacity: 1; }
+.login-boy svg { width: 100%; height: auto; display: block; }
+.login-stage.opened .login-boy { animation: settle 1s .6s cubic-bezier(.22,1,.36,1) forwards; }
+@keyframes settle {
+    0% { transform: translateX(-50%) translateY(0) scale(1); }
+    40% { transform: translateX(-50%) translateY(30px) scale(.97); }
+    100% { transform: translateX(-50%) translateY(50px) scale(1); }
+}
+
+/* The Hint */
+.login-hint {
+    position: absolute; left: 50%; bottom: 30px; transform: translateX(-50%);
+    font-size: 14px; font-weight: 600; color: #8a93a6; padding: 10px 20px; border-radius: 999px;
+    background: rgba(255,255,255,.9); border: 1px solid rgba(16,24,40,.06);
+    box-shadow: 0 8px 20px rgba(16,24,40,.06); cursor: pointer; z-index: 30;
+    animation: pulse 2s ease-in-out infinite; white-space: nowrap;
+}
+@keyframes pulse { 0%,100% { opacity: .6; transform: translateX(-50%) translateY(0); } 50% { opacity: 1; transform: translateX(-50%) translateY(-5px); } }
+.login-stage.opened .login-hint { opacity: 0; pointer-events: none; transition: opacity .3s; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="login-stage" id="stage">
   <div class="holder">
-    <section class="card glass" id="card" role="button" tabindex="0">
+    <section class="card" id="card" role="button" tabindex="0">
       <div class="card-content">
-        <div class="card-head">
-          <div class="badge" style="display:inline-block; margin-bottom:14px; color:#0a84ff; font-weight:800; letter-spacing:.08em; text-transform:uppercase; font-size:12px; background:rgba(10,132,255,.1); padding:7px 12px; border-radius:999px;">EliteBuss</div>
+        <div style="margin-bottom:24px;">
+          <div style="display:inline-block; margin-bottom:14px; color:#0a84ff; font-weight:800; letter-spacing:.08em; text-transform:uppercase; font-size:12px; background:rgba(10,132,255,.1); padding:7px 12px; border-radius:999px;">EliteBuss</div>
           <h1 style="font-size:30px; font-weight:800; margin:0 0 10px; letter-spacing:-.03em;">Welcome back</h1>
           <p style="margin:0; color:var(--muted); font-size:15px;">Sign in to continue your journey</p>
         </div>
+        
         <form method="post" class="form" novalidate>
           {% csrf_token %}
           {% if form.non_field_errors %}<div class="messages"><li class="error">{{ form.non_field_errors|striptags }}</li></div>{% endif %}
           {% for field in form %}
             <div class="form-group">
-              <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+              <label for="{{ field.id_for_label }}" style="display:block; font-size:13px; font-weight:700; color:var(--muted); margin:0 0 8px 6px;">{{ field.label }}</label>
               {{ field }}
               {% if field.errors %}<div class="note" style="margin-top:8px; color: var(--danger); font-size:13px;">{{ field.errors|striptags }}</div>{% endif %}
             </div>
@@ -27,7 +105,6 @@
       </div>
     </section>
 
-    <!-- The Big Login Character (Updated to match floating 3D style) -->
     <div class="login-boy" aria-hidden="true">
       <svg viewBox="0 0 260 340">
         <defs>
@@ -35,48 +112,30 @@
           <linearGradient id="lskin" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f9d5b3"/><stop offset="1" stop-color="#d6a17e"/></linearGradient>
           <linearGradient id="lneon" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#60a5fa"/><stop offset="1" stop-color="#a78bfa"/></linearGradient>
         </defs>
-        <!-- Body -->
         <path d="M60 340 L60 220 Q60 150 130 150 Q200 150 200 220 L200 340 Z" fill="url(#ljkt)"/>
         <path d="M100 150 L130 190 L160 150 Z" fill="#111827"/>
         <path d="M130 190 L130 340" stroke="#374151" stroke-width="4"/>
         <path d="M100 155 L130 185 L160 155" stroke="url(#lneon)" stroke-width="5" fill="none" stroke-linecap="round"/>
-        <!-- Left Arm Holding -->
         <path d="M60 220 Q20 230 30 300" stroke="url(#ljkt)" stroke-width="30" fill="none" stroke-linecap="round"/>
         <circle cx="30" cy="305" r="18" fill="url(#lskin)"/>
-        <!-- Right Arm Holding -->
         <path d="M200 220 Q240 230 230 300" stroke="url(#ljkt)" stroke-width="30" fill="none" stroke-linecap="round"/>
         <circle cx="230" cy="305" r="18" fill="url(#lskin)"/>
-        <!-- Neck & Head -->
         <rect x="112" y="110" width="36" height="45" rx="12" fill="#c48e6b"/>
         <ellipse cx="130" cy="80" rx="50" ry="55" fill="url(#lskin)"/>
-        <!-- Hair -->
         <path d="M78 70 Q78 20 130 20 Q182 20 182 70 Q160 45 130 45 Q100 45 78 70 Z" fill="#1e293b"/>
         <path d="M78 70 Q55 95 70 110 Q75 85 100 60 Z" fill="#1e293b"/>
         <path d="M182 70 Q205 95 190 110 Q185 85 160 60 Z" fill="#1e293b"/>
-        <!-- Visor -->
         <path d="M85 75 L175 75 L180 90 Q180 105 145 100 L130 95 L115 100 Q80 105 80 90 Z" fill="#0f172a"/>
         <path d="M90 80 L120 80" stroke="#38bdf8" stroke-width="4" stroke-linecap="round"/>
         <path d="M140 80 L170 80" stroke="#38bdf8" stroke-width="4" stroke-linecap="round"/>
         <path d="M80 85 L74 100" stroke="#0f172a" stroke-width="5" stroke-linecap="round"/>
         <path d="M180 85 L186 100" stroke="#0f172a" stroke-width="5" stroke-linecap="round"/>
-        <!-- Smirk -->
         <path d="M115 115 Q130 125 145 108" stroke="#8c5230" stroke-width="4" fill="none" stroke-linecap="round"/>
       </svg>
     </div>
   </div>
   <div class="login-hint" id="hint">Tap to open</div>
 </div>
-
-<style>
-  .login-boy{position:absolute;left:50%;bottom:-200px;transform:translateX(-50%);width:min(260px,80vw);pointer-events:none;z-index:5;opacity:0;transition:opacity .8s ease,transform .8s ease;filter:drop-shadow(0 30px 40px rgba(16,24,40,.25))}
-  .login-stage.ready .login-boy{opacity:1}
-  .login-boy svg{width:100%;height:auto;display:block}
-  .login-stage.opened .login-boy{animation:settle 1s .6s cubic-bezier(.22,1,.36,1) forwards}
-  @keyframes settle{0%{transform:translateX(-50%) translateY(0) scale(1)}40%{transform:translateX(-50%) translateY(30px) scale(.97)}100%{transform:translateX(-50%) translateY(50px) scale(1)}}
-  .login-hint{position:absolute;left:50%;bottom:30px;transform:translateX(-50%);font-size:14px;font-weight:600;color:#8a93a6;padding:10px 20px;border-radius:999px;background:rgba(255,255,255,.9);border:1px solid rgba(16,24,40,.06);box-shadow:0 8px 20px rgba(16,24,40,.06);cursor:pointer;z-index:30;animation:pulse 2s ease-in-out infinite; white-space:nowrap;}
-  @keyframes pulse{0%,100%{opacity:.6;transform:translateX(-50%) translateY(0)}50%{opacity:1;transform:translateX(-50%) translateY(-5px)}}
-  .login-stage.opened .login-hint{opacity:0;pointer-events:none;transition:opacity .3s}
-</style>
 
 <script>
 (function(){
